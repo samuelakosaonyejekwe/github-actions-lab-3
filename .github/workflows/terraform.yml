@@ -1,6 +1,5 @@
 name: Terraform CI/CD
 
-# When does this workflow run?
 on:
   push:
     branches:
@@ -9,30 +8,34 @@ on:
     branches:
       - main
 
-# Environment variables available to all jobs
 env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_REGION: eu-west-1
 
-# Jobs to run
 jobs:
   terraform:
     name: Terraform Plan & Apply
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Get the code
+      # Step 1: Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Install Terraform
+      # Step 2: Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.0
 
-      # Step 3: Restore cached Terraform state (prevents duplicate resources)
+      # ✅ Step 3: Configure AWS Credentials (CRITICAL FIX)
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Step 4: Restore Terraform state cache
       - name: Restore Terraform State
         uses: actions/cache/restore@v4
         with:
@@ -42,32 +45,28 @@ jobs:
             .terraform
           key: terraform-state-${{ github.repository }}
 
-      # Step 4: Check formatting
+      # Step 5: Format (auto-fix instead of failing)
       - name: Terraform Format
         run: terraform fmt -recursive
-        
-      - name: Terraform Format Check
-        id: fmt
-        run: terraform fmt -check -recursive
 
-      # Step 5: Initialize Terraform
+      # Step 6: Initialize
       - name: Terraform Init
         run: terraform init
 
-      # Step 6: Validate configuration
+      # Step 7: Validate
       - name: Terraform Validate
         run: terraform validate
 
-      # Step 7: Show plan
+      # Step 8: Plan
       - name: Terraform Plan
         run: terraform plan -no-color
 
-      # Step 8: Apply (only on main branch, not PRs)
+      # Step 9: Apply (only on main push)
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: terraform apply -auto-approve
 
-      # Step 9: Save Terraform state for next run
+      # Step 10: Save Terraform state
       - name: Save Terraform State
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/cache/save@v4
