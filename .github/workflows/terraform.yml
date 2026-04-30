@@ -1,0 +1,79 @@
+name: Terraform CI/CD
+
+# When does this workflow run?
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Environment variables available to all jobs
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+
+# Jobs to run
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Get the code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Install Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      # Step 3: Restore cached Terraform state (prevents duplicate resources)
+      - name: Restore Terraform State
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            terraform.tfstate
+            terraform.tfstate.backup
+            .terraform
+          key: terraform-state-${{ github.repository }}
+
+      # Step 4: Check formatting
+      - name: Terraform Format
+        run: terraform fmt -recursive
+        
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+
+      # Step 5: Initialize Terraform
+      - name: Terraform Init
+        run: terraform init
+
+      # Step 6: Validate configuration
+      - name: Terraform Validate
+        run: terraform validate
+
+      # Step 7: Show plan
+      - name: Terraform Plan
+        run: terraform plan -no-color
+
+      # Step 8: Apply (only on main branch, not PRs)
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve
+
+      # Step 9: Save Terraform state for next run
+      - name: Save Terraform State
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            terraform.tfstate
+            terraform.tfstate.backup
+            .terraform
+          key: terraform-state-${{ github.repository }}
