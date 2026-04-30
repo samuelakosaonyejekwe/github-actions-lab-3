@@ -15,7 +15,7 @@ provider "aws" {
 variable "bucket_suffix" {
   description = "Unique suffix for bucket name (use your initials)"
   type        = string
-  default     = "SAO"  # CHANGED THIS to my initials!
+  default     = "sao"  # CHANGED THIS to my initials!
 }
 
 # S3 Bucket - using fixed name to prevent duplicates
