@@ -9,33 +9,29 @@ on:
       - main
 
 env:
-  AWS_REGION: eu-west-2
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
 
 jobs:
   terraform:
     name: Terraform Plan & Apply
     runs-on: ubuntu-latest
 
+    # Required for PR comments
+    permissions:
+      contents: read
+      pull-requests: write
+
     steps:
-      # Step 1: Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.0
 
-      # ✅ Step 3: Configure AWS Credentials (CRITICAL FIX)
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      # Step 4: Restore Terraform state cache
       - name: Restore Terraform State
         uses: actions/cache/restore@v4
         with:
@@ -45,28 +41,66 @@ jobs:
             .terraform
           key: terraform-state-${{ github.repository }}
 
-      # Step 5: Format (auto-fix instead of failing)
       - name: Terraform Format
         run: terraform fmt -recursive
+        
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
 
-      # Step 6: Initialize
       - name: Terraform Init
+        id: init
         run: terraform init
 
-      # Step 7: Validate
       - name: Terraform Validate
-        run: terraform validate
+        id: validate
+        run: terraform validate -no-color
 
-      # Step 8: Plan
       - name: Terraform Plan
-        run: terraform plan -no-color
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        continue-on-error: true
 
-      # Step 9: Apply (only on main push)
+      - name: Comment Plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `### Terraform Plan Results
+
+            #### Format Check: \`${{ steps.fmt.outcome }}\`
+            #### Init: \`${{ steps.init.outcome }}\`
+            #### Validate: \`${{ steps.validate.outcome }}\`
+            #### Plan: \`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan Output</summary>
+
+            \`\`\`terraform
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Plan Status Check
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan
 
-      # Step 10: Save Terraform state
       - name: Save Terraform State
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/cache/save@v4
