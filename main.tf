@@ -20,10 +20,10 @@ variable "bucket_suffix" {
 
 # S3 Bucket - using fixed name to prevent duplicates
 resource "aws_s3_bucket" "demo" {
-  bucket = "cloudburst-demo-${var.bucket_suffix}"
+  bucket = "cloudburst-${var.environment}-${var.bucket_suffix}"
 
   tags = {
-    Name        = "CloudBurst Demo Bucket"
+    Name        = "CloudBurst ${var.environment} Bucket"
     Environment = "dev"
     ManagedBy   = "terraform"
     DeployedBy  = "github-actions"
