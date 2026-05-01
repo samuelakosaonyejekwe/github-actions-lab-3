@@ -20,7 +20,7 @@ variable "bucket_suffix" {
 
 # S3 Bucket - using fixed name to prevent duplicates
 resource "aws_s3_bucket" "demo" {
-  bucket = "cloudburst-${var.environment}-${var.bucket_suffix}"
+  bucket = "cloudburst-dev-${random_id.rand.hex}"
 
   tags = {
     Name        = "CloudBurst ${var.environment} Bucket"
@@ -33,7 +33,7 @@ resource "aws_s3_bucket" "demo" {
 
 # Enable versioning on the bucket
 resource "aws_s3_bucket_versioning" "demo" {
-  bucket = aws_s3_bucket.demo.id
+  bucket = "cloudburst-dev-${random_id.rand.hex}"
   versioning_configuration {
     status = "Enabled"
   }
@@ -58,5 +58,15 @@ variable "environment" {
 
 resource "random_id" "rand" {
   byte_length = 4
+}
+
+
+terraform {
+  required_providers {
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
+  }
 }
 
