@@ -24,7 +24,7 @@ resource "aws_s3_bucket" "demo" {
 
   tags = {
     Name        = "CloudBurst ${var.environment} Bucket"
-    Environment = "dev"
+    Environment = var.environment
     ManagedBy   = "terraform"
     DeployedBy  = "github-actions"
     TestTag = "pr-comment-test"
@@ -48,4 +48,8 @@ output "bucket_name" {
 output "bucket_arn" {
   description = "ARN of the created S3 bucket"
   value       = aws_s3_bucket.demo.arn
+}variable "environment" {
+  description = "Deployment environment"
+  type        = string
+  default     = "dev"
 }
