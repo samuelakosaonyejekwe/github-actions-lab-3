@@ -48,7 +48,9 @@ output "bucket_name" {
 output "bucket_arn" {
   description = "ARN of the created S3 bucket"
   value       = aws_s3_bucket.demo.arn
-}variable "environment" {
+}
+
+variable "environment" {
   description = "Deployment environment"
   type        = string
   default     = "dev"
